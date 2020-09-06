@@ -1,9 +1,9 @@
 <template>
   <view class="gpa-plus uni-padding-wrap uni-common-mt">
     <view class="gpa-plus__matrix-display uni-flex uni-row">
-      <view>矩阵A<view class="matrix"><text>{{ matrixAStr }}</text></view></view>
-      <view>矩阵B<view class="matrix"><text>{{ matrixBStr }}</text></view></view>
-      <view>结果<view class="matrix"><text>{{ matrixResult }}</text></view></view>
+      <view>矩阵A<view class="matrix"><text>{{ prettyMatrixA }}</text></view></view>
+      <view>矩阵B<view class="matrix"><text>{{ prettyMatrixB }}</text></view></view>
+      <view>结果<view class="matrix"><text>{{ prettyMatrixResult }}</text></view></view>
     </view>
     <view class="gpa-plus__tmp-row">
       /: {{ tmpRow }}
@@ -21,11 +21,14 @@
         <button @click="clickNumber(9)" class="gpa-plus__number">9</button>
         <button @click="clickNumber('.')" class="gpa-plus__number">.</button>
         <button @click="clickNumber(0)" class="gpa-plus__number">0</button>
-        <button @click="clickNumber(',')" class="gpa-plus__number">分隔</button>
-        <view class="insert-area uni-flex uni-row">
-          <button @click="insertOneRow('A')" class="insert-btn">插入A</button>
-          <button @click="insertOneRow('B')" class="insert-btn">插入B</button>
-        </view>
+        <button @click="clickNumber(',')" class="gpa-plus__number gpa-plus__number--small-text">分隔</button>
+        <button @click="clickNumber('-')" class="gpa-plus__number">-</button>
+        <button @click="insertOneRow('A')" class="gpa-plus__number gpa-plus__number--small-text">插入A</button>
+        <button @click="insertOneRow('B')" class="gpa-plus__number gpa-plus__number--small-text">插入B</button>
+        <!--<view class="insert-area uni-flex uni-row">-->
+        <!--  <button @click="insertOneRow('A')" class="insert-btn">插入A</button>-->
+        <!--  <button @click="insertOneRow('B')" class="insert-btn">插入B</button>-->
+        <!--</view>-->
       </view>
       <view class="gpa-plus__right-area uni-flex">
         <button @click="backspace" class="gpa-plus__right-area-button">退格</button>
@@ -34,6 +37,10 @@
         <button @click="removeMatrixLatestLine('B')" class="gpa-plus__right-area-button">删除B末行</button>
         <button @click="clearMatrix('A')" class="gpa-plus__right-area-button">清空A</button>
         <button @click="clearMatrix('B')" class="gpa-plus__right-area-button">清空B</button>
+        <button @click="undo('A')" class="gpa-plus__right-area-button">撤销A</button>
+        <button @click="undo('B')" class="gpa-plus__right-area-button">撤销B</button>
+        <button @click="resultToMatrix('A')" class="gpa-plus__right-area-button">结果设为A</button>
+        <button @click="resultToMatrix('B')" class="gpa-plus__right-area-button">结果设为B</button>
       </view>
     </view>
     <view class="gpa-plus__bottom-area uni-flex">
@@ -51,8 +58,9 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue } from 'vue-property-decorator'
+import { Component, Vue, Watch } from 'vue-property-decorator'
 import { create, all } from 'mathjs'
+import { StringUtil } from '@/utils'
 
 const config = {
   epsilon: 1e-12,
@@ -66,22 +74,28 @@ const math = create(all, config)
 @Component
 export default class GPAPlus extends Vue {
   tmpRow = ''
+  matrixAHistoryStack: string[] = []
   matrixAStr = ''
+  matrixBHistoryStack: string[] = []
   matrixBStr = ''
   matrixResult = ''
+
+  static SYMBOL_LIST: any[] = [',', '-', '.']
 
   onLoad () {
 
   }
 
   clickNumber (num: string | number) {
-    if (num === ',') {
+    const target = this.tmpRow + num
+    if (GPAPlus.SYMBOL_LIST.includes(num)) {
       if (!this.tmpRow) {
         this.showDefaultToast('您还没有输入内容')
         return
-      } else if (this.tmpRowLatestChar === ',') {
-        return
       }
+    }
+    if (!this.isLegalRow(target)) {
+      return
     }
     this.tmpRow += num
   }
@@ -90,22 +104,25 @@ export default class GPAPlus extends Vue {
     if (!this.tmpRow) {
       return
     }
-    if (this.tmpRowLatestChar === ',') {
+    if (this.tmpRowLatestChar === ',' || this.tmpRowLatestChar === '-') {
       this.tmpRow = this.tmpRow.substring(0, this.tmpRow.length - 1)
     }
     const tmpRowLength = this.tmpRow.split(',').length
+    const newRow = this.tmpRow.split(',').map(x => Number(x)).join(',') + '\n'
     if (matrix === 'A') {
       if (this.matrixA[0] && this.matrixA[0].length !== 0 && this.matrixA[0].length !== tmpRowLength) {
         this.showDefaultToast('与矩阵A已插入形状不一致')
         return
       }
-      this.matrixAStr += this.tmpRow + '\n'
+      this.matrixAHistoryStack.push(this.matrixAStr)
+      this.matrixAStr += newRow
     } else {
       if (this.matrixB[0] && this.matrixB[0].length !== 0 && this.matrixB[0].length !== tmpRowLength) {
         this.showDefaultToast('与矩阵B已插入形状不一致')
         return
       }
-      this.matrixBStr += this.tmpRow + '\n'
+      this.matrixBHistoryStack.push(this.matrixBStr)
+      this.matrixBStr += newRow
     }
     this.tmpRow = ''
   }
@@ -124,25 +141,69 @@ export default class GPAPlus extends Vue {
 
   removeMatrixLatestLine (matrix: 'A' | 'B') {
     if (matrix === 'A') {
+      this.matrixAHistoryStack.push(this.matrixAStr)
       if (this.matrixAStr.trim().split('\n').length <= 1) {
-        this.clearMatrix(matrix)
+        this.clearOneMatrix(matrix)
       } else {
         this.matrixAStr = this.matrixAStr.trim().split('\n').slice(0, -1).join('\n') + '\n'
+        this.matrixAHistoryStack.push(this.matrixAStr)
       }
     } else {
+      this.matrixBHistoryStack.push(this.matrixBStr)
       if (this.matrixBStr.trim().split('\n').length <= 1) {
-        this.clearMatrix(matrix)
+        this.clearOneMatrix(matrix)
       } else {
         this.matrixBStr = this.matrixBStr.trim().split('\n').slice(0, -1).join('\n') + '\n'
+        this.matrixBHistoryStack.push(this.matrixBStr)
       }
     }
   }
 
   clearMatrix (matrix: 'A' | 'B') {
     if (matrix === 'A') {
+      this.matrixAHistoryStack.push(this.matrixAStr)
+    } else {
+      this.matrixBHistoryStack.push(this.matrixBStr)
+    }
+    this.clearOneMatrix(matrix)
+  }
+
+  private clearOneMatrix (matrix: 'A' | 'B') {
+    if (matrix === 'A') {
       this.matrixAStr = ''
     } else {
       this.matrixBStr = ''
+    }
+  }
+
+  undo (matrix: 'A' | 'B') {
+    if (matrix === 'A') {
+      const prevOp = this.matrixAHistoryStack.pop()
+      if (prevOp) {
+        this.matrixAStr = prevOp
+      } else {
+        this.matrixAStr = ''
+      }
+    } else {
+      const prevOp = this.matrixBHistoryStack.pop()
+      if (prevOp) {
+        this.matrixBStr = prevOp
+      } else {
+        this.matrixBStr = ''
+      }
+    }
+  }
+
+  resultToMatrix (matrix: 'A' | 'B') {
+    if (!this.matrixResult) {
+      return
+    }
+    if (matrix === 'A') {
+      this.matrixAHistoryStack.push(this.matrixAStr)
+      this.matrixAStr = this.matrixResult + '\n'
+    } else {
+      this.matrixBHistoryStack.push(this.matrixBStr)
+      this.matrixBStr = this.matrixResult + '\n'
     }
   }
 
@@ -223,6 +284,18 @@ export default class GPAPlus extends Vue {
     }
   }
 
+  get prettyMatrixA () {
+    return this.matrixAStr.replace(/,/g, '\t')
+  }
+
+  get prettyMatrixB () {
+    return this.matrixBStr.replace(/,/g, '\t')
+  }
+
+  get prettyMatrixResult () {
+    return this.matrixResult.replace(/,/g, '\t')
+  }
+
   get matrixA () {
     if (!this.matrixAStr.trim()) {
       return [[]]
@@ -243,24 +316,42 @@ export default class GPAPlus extends Vue {
     return this.tmpRow.charAt(this.tmpRow.length - 1)
   }
 
+  rowLatestChar (str: string) {
+    return str.charAt(str.length - 1)
+  }
+
+  isLegalRow (str: string) {
+    let tmpRow = str.trim()
+    if (this.rowLatestChar(str) === ',') {
+      tmpRow = str.substr(0, str.length - 1)
+    }
+    console.log(tmpRow)
+    const numList = tmpRow.split(',')
+    for (const num of numList) {
+      if (!num) {
+        return false
+      }
+      if (num === '.') {
+        return false
+      }
+      if (isNaN(Number(num)) && num.length > 1) {
+        return false
+      }
+    }
+    return true
+  }
+
   formatExceptionMessage (e: Error) {
     return e.name + ': ' + e.message
   }
 
-  // formatMatrix (matrix: number[] | number[][]) {
-  //   if (matrix[0] instanceof Array) {
-  //     for (let i = 0; i < matrix.length; i++) {
-  //       for (let j = 0; j < matrix[0].length; j++) {
-  //         matrix[i][j] = this.getPrecisionNumber(matrix[i][j])
-  //       }
+  // formatMatrix (matrix: number[][]) {
+  //   for (let i = 0; i < matrix.length; i++) {
+  //     for (let j = 0; j < matrix[0].length; j++) {
+  //       matrix[i][j] = this.getPrecisionNumber(matrix[i][j])
   //     }
-  //     return matrix.join('\n')
-  //   } else {
-  //     for (let i = 0; i < matrix.length; i++) {
-  //       matrix[i] = this.getPrecisionNumber(matrix[i])
-  //     }
-  //     return matrix.toString()
   //   }
+  //   return matrix.join('\n')
   // }
 
   getPrecisionNumber (value: any, precision = 4) {
@@ -292,6 +383,9 @@ $op-btn-border-color: #357ebd;
   button {
     margin: 10rpx;
   }
+  text {
+    white-space: pre-wrap;
+  }
   &__matrix-display {
     justify-content: space-between;
     flex-wrap: wrap;
@@ -318,12 +412,18 @@ $op-btn-border-color: #357ebd;
   }
   &__number {
     width: 140rpx;
+    height: 120rpx;
+    line-height: 120rpx;
+    &--small-text {
+      font-size: 28rpx;
+    }
   }
   &__right-area {
     flex: 1;
     flex-wrap: wrap;
   }
   &__right-area-button {
+    margin: 4rpx 10rpx !important;
     min-width: 190rpx;
     height: 60rpx;
     font-size: 90%;
