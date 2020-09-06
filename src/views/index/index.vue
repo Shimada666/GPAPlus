@@ -52,8 +52,16 @@
 
 <script lang="ts">
 import { Component, Vue } from 'vue-property-decorator'
-// @ts-ignore
-import * as math from 'mathjs'
+import { create, all } from 'mathjs'
+
+const config = {
+  epsilon: 1e-12,
+  matrix: 'Matrix',
+  number: 'number',
+  precision: 4,
+  predictable: false
+}
+const math = create(all, config)
 
 @Component
 export default class GPAPlus extends Vue {
@@ -71,7 +79,7 @@ export default class GPAPlus extends Vue {
       if (!this.tmpRow) {
         this.showDefaultToast('您还没有输入内容')
         return
-      } else if (this.tmpRow.charAt(this.tmpRow.length - 1) === ',') {
+      } else if (this.tmpRowLatestChar === ',') {
         return
       }
     }
@@ -79,9 +87,24 @@ export default class GPAPlus extends Vue {
   }
 
   insertOneRow (matrix: 'A' | 'B') {
+    if (!this.tmpRow) {
+      return
+    }
+    if (this.tmpRowLatestChar === ',') {
+      this.tmpRow = this.tmpRow.substring(0, this.tmpRow.length - 1)
+    }
+    const tmpRowLength = this.tmpRow.split(',').length
     if (matrix === 'A') {
+      if (this.matrixA[0] && this.matrixA[0].length !== 0 && this.matrixA[0].length !== tmpRowLength) {
+        this.showDefaultToast('与矩阵A已插入形状不一致')
+        return
+      }
       this.matrixAStr += this.tmpRow + '\n'
     } else {
+      if (this.matrixB[0] && this.matrixB[0].length !== 0 && this.matrixB[0].length !== tmpRowLength) {
+        this.showDefaultToast('与矩阵B已插入形状不一致')
+        return
+      }
       this.matrixBStr += this.tmpRow + '\n'
     }
     this.tmpRow = ''
@@ -125,7 +148,8 @@ export default class GPAPlus extends Vue {
 
   matrixADet () {
     try {
-      this.matrixResult = math.det(this.matrixA)
+      // @ts-ignore
+      this.matrixResult = math.det!(this.matrixA) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -133,7 +157,8 @@ export default class GPAPlus extends Vue {
 
   matrixAInv () {
     try {
-      this.matrixResult = math.inv(this.matrixA)
+      // @ts-ignore
+      this.matrixResult = math.inv(this.matrixA).join('\n')
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -141,7 +166,8 @@ export default class GPAPlus extends Vue {
 
   matrixATrace () {
     try {
-      this.matrixResult = math.trace(this.matrixA)
+      // @ts-ignore
+      this.matrixResult = math.trace(this.matrixA) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -150,9 +176,11 @@ export default class GPAPlus extends Vue {
   matrixTranspose (matrix: 'A' | 'B') {
     try {
       if (matrix === 'A') {
-        this.matrixAStr = math.transpose(this.matrixA).join('\n')
+        // @ts-ignore
+        this.matrixResult = math.transpose(this.matrixA).join('\n')
       } else {
-        this.matrixBStr = math.transpose(this.matrixB).join('\n')
+        // @ts-ignore
+        this.matrixResult = math.transpose(this.matrixB).join('\n')
       }
     } catch (e) {
       this.showErrorToast(e)
@@ -161,6 +189,7 @@ export default class GPAPlus extends Vue {
 
   matrixMultiply () {
     try {
+      // @ts-ignore
       this.matrixResult = math.multiply(this.matrixA, this.matrixB).join('\n')
     } catch (e) {
       this.showErrorToast(e)
@@ -169,6 +198,7 @@ export default class GPAPlus extends Vue {
 
   matrixAdd () {
     try {
+      // @ts-ignore
       this.matrixResult = math.add(this.matrixA, this.matrixB).join('\n')
     } catch (e) {
       this.showErrorToast(e)
@@ -177,7 +207,8 @@ export default class GPAPlus extends Vue {
 
   matrixCross () {
     try {
-      this.matrixResult = math.cross(this.matrixA, this.matrixB)
+      // @ts-ignore
+      this.matrixResult = math.cross(this.matrixA, this.matrixB) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -185,24 +216,55 @@ export default class GPAPlus extends Vue {
 
   matrixDot () {
     try {
-      this.matrixResult = math.dot(math.squeeze(this.matrixA), math.squeeze(this.matrixB))
+      // @ts-ignore
+      this.matrixResult = math.dot(math.squeeze(this.matrixA), math.squeeze(this.matrixB)) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
   }
 
   get matrixA () {
+    if (!this.matrixAStr.trim()) {
+      return [[]]
+    }
     const tmp = this.matrixAStr.trim().split('\n')
-    return tmp.map(row => row.split(','))
+    return tmp.map(row => row.split(',').map(item => math.bignumber!(Number(item))))
   }
 
   get matrixB () {
+    if (!this.matrixBStr.trim()) {
+      return [[]]
+    }
     const tmp = this.matrixBStr.trim().split('\n')
-    return tmp.map(row => row.split(','))
+    return tmp.map(row => row.split(',').map(item => math.bignumber!(Number(item))))
+  }
+
+  get tmpRowLatestChar () {
+    return this.tmpRow.charAt(this.tmpRow.length - 1)
   }
 
   formatExceptionMessage (e: Error) {
     return e.name + ': ' + e.message
+  }
+
+  // formatMatrix (matrix: number[] | number[][]) {
+  //   if (matrix[0] instanceof Array) {
+  //     for (let i = 0; i < matrix.length; i++) {
+  //       for (let j = 0; j < matrix[0].length; j++) {
+  //         matrix[i][j] = this.getPrecisionNumber(matrix[i][j])
+  //       }
+  //     }
+  //     return matrix.join('\n')
+  //   } else {
+  //     for (let i = 0; i < matrix.length; i++) {
+  //       matrix[i] = this.getPrecisionNumber(matrix[i])
+  //     }
+  //     return matrix.toString()
+  //   }
+  // }
+
+  getPrecisionNumber (value: any, precision = 4) {
+    return math.format!(value, precision)
   }
 
   showDefaultToast (msg: string, duration = 2000) {
