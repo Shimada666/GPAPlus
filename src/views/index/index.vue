@@ -60,15 +60,15 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue, Watch } from 'vue-property-decorator'
+import { Component, Vue } from 'vue-property-decorator'
 import { create, all } from 'mathjs'
-import { StringUtil } from '@/utils'
+import { CommonUtil } from '@/utils'
 
 const config = {
   epsilon: 1e-12,
   matrix: 'Matrix',
   number: 'number',
-  precision: 4,
+  precision: 12,
   predictable: false
 }
 const math = create(all, config)
@@ -221,8 +221,7 @@ export default class GPAPlus extends Vue {
 
   matrixADet () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.det!(this.matrixA) + ''
+      this.matrixResult = this.formatMatrixItem(math.det!(this.matrixA)) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -230,8 +229,7 @@ export default class GPAPlus extends Vue {
 
   matrixAInv () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.inv(this.matrixA).join('\n')
+      this.matrixResult = this.formatMatrix(math.inv!(this.matrixA))
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -239,8 +237,7 @@ export default class GPAPlus extends Vue {
 
   matrixATrace () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.trace(this.matrixA) + ''
+      this.matrixResult = this.formatMatrixItem(math.trace!(this.matrixA)) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -249,11 +246,9 @@ export default class GPAPlus extends Vue {
   matrixTranspose (matrix: 'A' | 'B') {
     try {
       if (matrix === 'A') {
-        // @ts-ignore
-        this.matrixResult = math.transpose(this.matrixA).join('\n')
+        this.matrixResult = this.formatMatrix(math.transpose!(this.matrixA))
       } else {
-        // @ts-ignore
-        this.matrixResult = math.transpose(this.matrixB).join('\n')
+        this.matrixResult = this.formatMatrix(math.transpose!(this.matrixB))
       }
     } catch (e) {
       this.showErrorToast(e)
@@ -262,8 +257,7 @@ export default class GPAPlus extends Vue {
 
   matrixMultiply () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.multiply(this.matrixA, this.matrixB).join('\n')
+      this.matrixResult = this.formatMatrix(math.multiply!(this.matrixA, this.matrixB))
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -271,8 +265,7 @@ export default class GPAPlus extends Vue {
 
   matrixAdd () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.add(this.matrixA, this.matrixB).join('\n')
+      this.matrixResult = this.formatMatrix((math.add!(this.matrixA, this.matrixB) as number[][]))
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -280,8 +273,7 @@ export default class GPAPlus extends Vue {
 
   matrixCross () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.cross(this.matrixA, this.matrixB) + ''
+      this.matrixResult = this.formatMatrix((math.cross!(this.matrixA, this.matrixB) as number[][]))
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -289,8 +281,7 @@ export default class GPAPlus extends Vue {
 
   matrixDot () {
     try {
-      // @ts-ignore
-      this.matrixResult = math.dot(math.squeeze(this.matrixA), math.squeeze(this.matrixB)) + ''
+      this.matrixResult = this.formatMatrixItem(math.dot!(math.squeeze!(this.matrixA), math.squeeze!(this.matrixB))) + ''
     } catch (e) {
       this.showErrorToast(e)
     }
@@ -313,7 +304,7 @@ export default class GPAPlus extends Vue {
       return [[]]
     }
     const tmp = this.matrixAStr.trim().split('\n')
-    return tmp.map(row => row.split(',').map(item => math.bignumber!(Number(item))))
+    return tmp.map(row => row.split(',').map(item => Number(item)))
   }
 
   get matrixB () {
@@ -321,7 +312,7 @@ export default class GPAPlus extends Vue {
       return [[]]
     }
     const tmp = this.matrixBStr.trim().split('\n')
-    return tmp.map(row => row.split(',').map(item => math.bignumber!(Number(item))))
+    return tmp.map(row => row.split(',').map(item => Number(item)))
   }
 
   get tmpRowLatestChar () {
@@ -337,7 +328,6 @@ export default class GPAPlus extends Vue {
     if (this.rowLatestChar(str) === ',') {
       tmpRow = str.substr(0, str.length - 1)
     }
-    console.log(tmpRow)
     const numList = tmpRow.split(',')
     for (const num of numList) {
       if (!num) {
@@ -357,17 +347,17 @@ export default class GPAPlus extends Vue {
     return e.name + ': ' + e.message
   }
 
-  // formatMatrix (matrix: number[][]) {
-  //   for (let i = 0; i < matrix.length; i++) {
-  //     for (let j = 0; j < matrix[0].length; j++) {
-  //       matrix[i][j] = this.getPrecisionNumber(matrix[i][j])
-  //     }
-  //   }
-  //   return matrix.join('\n')
-  // }
+  formatMatrix (matrix: number[][]) {
+    for (let i = 0; i < matrix.length; i++) {
+      for (let j = 0; j < matrix[0].length; j++) {
+        matrix[i][j] = this.formatMatrixItem(matrix[i][j])
+      }
+    }
+    return matrix.join('\n')
+  }
 
-  getPrecisionNumber (value: any, precision = 4) {
-    return math.format!(value, precision)
+  formatMatrixItem (value: any, fractionDigits = 3) {
+    return CommonUtil.keepNumDecimal(value, fractionDigits)
   }
 
   showDefaultToast (msg: string, duration = 2000) {
