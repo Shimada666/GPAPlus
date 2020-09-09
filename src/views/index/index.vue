@@ -1,5 +1,7 @@
 <template>
   <view class="gpa-plus uni-padding-wrap uni-common-mt">
+    <div class="gpa-plus__button-help" @click="showToggle">点击显示/隐藏帮助</div>
+    <view v-if="showTextSwitch" class="help"><text>{{ contentHelp }}</text></view>
     <view class="gpa-plus__matrix-display uni-flex uni-row">
       <view>矩阵A<view class="matrix"><text>{{ prettyMatrixA }}</text></view></view>
       <view>矩阵B<view class="matrix"><text>{{ prettyMatrixB }}</text></view></view>
@@ -79,13 +81,23 @@ export default class GPAPlus extends Vue {
   matrixBHistoryStack: string[] = []
   matrixBStr = ''
   matrixResult = ''
-
+  showTextSwitch = false
+  contentHelp = '线代计算器，时隔两年堂堂更新！全新界面，全新体验。\n' +
+      '\n' +
+      '每次输入一行，相邻数据使用分隔符分隔。\n' +
+      '矩阵相乘的输出为 A x B。\n' +
+      '为方便，叉乘、点乘的输入AB均为一行的行向量。\n' +
+      '\n' +
+      '发现任何bug或有任何需求可以到 (github链接) 提交issue，或发邮件至lune_z@foxmail.com。\n' +
+      '玩得愉快！\n '
   static SYMBOL_LIST: any[] = [',', '-', '.']
 
   onLoad () {
 
   }
-
+  showToggle () {
+    this.showTextSwitch = !this.showTextSwitch
+  }
   clickNumber (num: string | number) {
     const target = this.tmpRow + num
     if (GPAPlus.SYMBOL_LIST.includes(num)) {
@@ -385,6 +397,10 @@ $op-btn-border-color: #357ebd;
   }
   text {
     white-space: pre-wrap;
+  }
+  &__button-help {
+    text-align: center;
+    margin-bottom: 12rpx;
   }
   &__matrix-display {
     justify-content: space-between;
