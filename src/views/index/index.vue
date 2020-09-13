@@ -93,7 +93,10 @@ export default class GPAPlus extends Vue {
   static SYMBOL_LIST: any[] = [',', '-', '.']
 
   onLoad () {
-
+    uni.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
   }
   showToggle () {
     this.showTextSwitch = !this.showTextSwitch
