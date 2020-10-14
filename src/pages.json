@@ -5,6 +5,18 @@
 			"style": {
 				"navigationBarTitleText": "GPA+ 矩阵计算器"
 			}
+		},
+		{
+			"path": "views/message-board",
+			"style": {
+				"navigationBarTitleText": "留言板"
+			}
+		},
+		{
+			"path": "components/uni-comment",
+			"style": {
+				"navigationBarTitleText": "qqq"
+			}
 		}
 	],
 	"globalStyle": {

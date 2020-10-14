@@ -28,9 +28,7 @@ export default Vue.extend({
   onHide () {
   },
   onShareAppMessage (res) {
-    console.log(res)
     if (res.from === 'button') {
-      console.log(res.target)
     }
     return {
       title: 'GPAPlus 矩阵计算器',
@@ -44,4 +42,7 @@ export default Vue.extend({
 /* uni.css - 通用组件、模板样式库，可以当作一套ui库应用 */
 @import './asset/uni.css';
 @import './asset/variable.scss';
+page {
+  background-color: #f4f5f6;
+}
 </style>
